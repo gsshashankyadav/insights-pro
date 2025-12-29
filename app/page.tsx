@@ -1,65 +1,122 @@
-import Image from "next/image";
+"use client"
+
+import { useState } from "react"
+import { useUser } from "@clerk/nextjs"
+import UrlInput from "@/components/url-input"
+import AnalyzeButton from "@/components/analyze-button"
+import LoadingOverlay from "@/components/loading-overlay"
+import ResultsTabs from "@/components/results-tabs"
+import UserMenu from "@/components/user-menu"
+import { fetchInsights } from "@/lib/api"
+import type { InsightResponse } from "@/lib/types"
 
 export default function Home() {
+  const { isLoaded, isSignedIn, user } = useUser()
+  const [url, setUrl] = useState("")
+  const [insights, setInsights] = useState<InsightResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saveLoading, setSaveLoading] = useState(false)
+
+  const handleAnalyze = async () => {
+    if (!isSignedIn) {
+      setError("Please sign in first to analyze Reddit discussions")
+      return
+    }
+
+    if (!url) {
+      setError("Please paste a Reddit URL")
+      return
+    }
+
+    if (!url.includes("reddit.com")) {
+      setError("Please enter a valid Reddit URL")
+      return
+    }
+
+    setError(null)
+    setLoading(true)
+
+    try {
+      const data = await fetchInsights({ url })
+      setInsights(data)
+
+      setSaveLoading(true)
+      try {
+        const cleanUrl = url.endsWith(".json") ? url.slice(0, -5) : url
+
+        const response = await fetch("/api/insights/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: cleanUrl,
+            insights: data,
+            title: data.title || cleanUrl,
+          }),
+        })
+
+        if (!response.ok) {
+          console.error("Failed to auto-save insights")
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err)
+      } finally {
+        setSaveLoading(false)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="border-b border-border/20 backdrop-blur-sm sticky top-0 z-40">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-mono font-semibold">Insights</h2>
+          {isLoaded && <UserMenu isSignedIn={isSignedIn} user={user} />}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+
+      <div className="border-b border-border/20 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto px-6 py-24 md:py-40">
+          <div className="space-y-4">
+            <h1 className="text-7xl md:text-8xl font-serif font-bold leading-tight animate-slide-in-up text-balance">
+              Insights
+            </h1>
+            <p
+              className="text-lg text-muted-foreground font-mono animate-slide-in-up"
+              style={{ animationDelay: "0.1s" }}
+            >
+              Extract structured intelligence from Reddit discussions
+            </p>
+          </div>
         </div>
-      </main>
-    </div>
-  );
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6 py-16">
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-mono text-muted-foreground mb-3 uppercase tracking-wider">
+              Reddit URL
+            </label>
+            <UrlInput value={url} onChange={setUrl} onSubmit={handleAnalyze} />
+          </div>
+
+          <AnalyzeButton onClick={handleAnalyze} disabled={loading} />
+
+          {error && (
+            <div className="p-4 bg-destructive/10 border border-destructive/30 rounded text-destructive text-sm animate-slide-in-up">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {insights && !loading && <ResultsTabs insights={insights} url={url} />}
+
+      {loading && <LoadingOverlay />}
+    </main>
+  )
 }
