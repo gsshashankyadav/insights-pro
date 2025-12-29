@@ -53,7 +53,10 @@ export async function GET(request: Request) {
       },
     })
 
-    const response = await fetch(apiUrl)
+    const response = await fetch(apiUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AnalysisTool/1.0" },
+      next: { revalidate: 3600 },
+    } )
 
     if (!response.ok) {
       return NextResponse.json({ error: "Failed to fetch data from Reddit", response }, { status: 400 })
