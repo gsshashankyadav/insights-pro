@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     const response = await fetch(apiUrl)
 
     if (!response.ok) {
-      return NextResponse.json({ error: "Failed to fetch data from Reddit", apiUrl }, { status: 400 })
+      return NextResponse.json({ error: "Failed to fetch data from Reddit", response }, { status: 400 })
     }
 
     const data = await response.json()
